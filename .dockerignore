@@ -1,0 +1,10 @@
+node_modules
+.node_history
+
+.tmp
+.env
+license.txt
+exports
+*.cache
+build
+.strapi-updater.json
