@@ -1,0 +1,35 @@
+image: atlassian/default-image:3
+
+definitions:
+  services:
+    docker:
+      memory: 3072
+    docker-with-large-memory:
+      memory: 3072
+      type: docker
+
+pipelines:
+  branches:
+    main:
+    - step:
+        name: "Publish to Digital Ocean registry blogcms"
+        services:
+          - docker-with-large-memory
+        script:
+          - export NODE_OPTIONS=--max_old_space_size=3072
+          - docker login -u $DOCKER_REGISTRY_TOKEN -p $DOCKER_REGISTRY_TOKEN registry.digitalocean.com/remaster-mvp
+          - docker build . -t blogcms:stage
+          - docker tag blogcms:stage registry.digitalocean.com/remaster-mvp/blogcms:stage
+          - docker push registry.digitalocean.com/remaster-mvp/blogcms:stage
+        
+    - step:
+        name: Deploy to Kubernetes
+        image: atlassian/pipelines-kubectl
+        script:
+        # Configure kubectl 
+        # NOTE: $KUBECONFIG is secret stored as a base64 encoded st
+            # Base64 decode our kubeconfig file into a temporary kubeconfig.yml file (this will be destroyed automatically after this step runs)
+          - echo $KUBECONFIG | base64 -d > kubeconfig.yml
+            # Tell our Kubernetes deployment to use the new Docker image 
+          - kubectl --kubeconfig=kubeconfig.yml --namespace=blogcms set image deployment/blogcms blogcms=registry.digitalocean.com/remaster-mvp/blogcms:stage
+          - kubectl --kubeconfig=kubeconfig.yml rollout restart -n blogcms deployment blogcms
